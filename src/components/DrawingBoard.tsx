@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import  { useState, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Undo2, RotateCcw, Save } from 'lucide-react';  
+import { Undo2, RotateCcw } from 'lucide-react';  
 
 const DrawingBoard = ({ onStrokeUpdate, onDrawingStateChange }) => {
   const canvasRef = useRef(null);

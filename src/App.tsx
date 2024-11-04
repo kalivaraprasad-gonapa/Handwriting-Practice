@@ -9,7 +9,7 @@ import { LANGUAGE_DATA } from './constants/languageData';
 
 const App = () => {
   const [currentLanguage, setCurrentLanguage] = useState('english');
-  const [currentCharacter, setCurrentCharacter] = useState(null);
+  const [currentCharacter, setCurrentCharacter] = useState<string | null>(null); // Change here
   const [currentLevel, setCurrentLevel] = useState('beginner');
   const [strokeData, setStrokeData] = useState([]);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -20,14 +20,14 @@ const App = () => {
     new AIStrokeAnalysisService(import.meta.env.REACT_APP_AI_PROVIDER || 'claude', import.meta.env.REACT_APP_AI_KEY || "")
   );
 
-  const handleLanguageChange = (info) => {
+  const handleLanguageChange = (info: { language: string; level: string; character: string }) => {
     setCurrentLanguage(info.language);
     setCurrentLevel(info.level);
     setCurrentCharacter(info.character);
     clearDrawing();
-  };
+};
 
-  const handleCharacterChange = (info) => {
+  const handleCharacterChange = (info: { character: string; level: string }) => {
     setCurrentCharacter(info.character);
     setCurrentLevel(info.level);
     clearDrawing();
