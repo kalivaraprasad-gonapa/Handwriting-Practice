@@ -1,6 +1,8 @@
 // src/utils/aiService.js
 
 class AIService {
+  provider: string; // Declare provider property
+  apiKey: string;   // Declare apiKey property
     constructor(provider, apiKey) {
       this.provider = provider;
       this.apiKey = apiKey;

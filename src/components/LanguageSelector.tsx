@@ -96,11 +96,14 @@ const LanguageSelector = ({
               <SelectValue placeholder="Select Level" />
             </SelectTrigger>
             <SelectContent>
-              {Object.entries(LANGUAGE_DATA[selectedLanguage].levels).map(([key, level]) => (
+            {Object.entries(LANGUAGE_DATA[selectedLanguage].levels).map(([key, level]) => {
+              const typedLevel = level as { name: string }; // Type assertion
+              return (
                 <SelectItem key={key} value={key}>
-                  {level.name}
+                  {typedLevel.name}
                 </SelectItem>
-              ))}
+              );
+            })}
             </SelectContent>
           </Select>
         </div>

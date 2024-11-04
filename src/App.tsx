@@ -13,6 +13,7 @@ const App = () => {
   const [currentLevel, setCurrentLevel] = useState('beginner');
   const [strokeData, setStrokeData] = useState([]);
   const [isDrawing, setIsDrawing] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [aiService] = useState(
     new AIService(import.meta.env.REACT_APP_AI_PROVIDER || 'claude', import.meta.env.REACT_APP_AI_KEY || "")
   );

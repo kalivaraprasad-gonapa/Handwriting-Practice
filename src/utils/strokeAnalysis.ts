@@ -57,7 +57,13 @@ export const calculateStrokeMetrics = (strokes) => {
   };
   
   export const compareWithIdeal = (userMetrics, idealMetrics) => {
-    const comparison = {
+    const comparison: { 
+        size: number; 
+        proportion: number; 
+        strokeCount: number; 
+        density: number; 
+        totalScore?: number;
+    } = {
       size: calculateSizeDifference(userMetrics, idealMetrics),
       proportion: calculateProportionDifference(userMetrics, idealMetrics),
       strokeCount: Math.abs(userMetrics.totalStrokes - idealMetrics.totalStrokes),
