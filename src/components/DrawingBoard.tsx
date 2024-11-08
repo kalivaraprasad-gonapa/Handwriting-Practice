@@ -5,11 +5,13 @@ import { StrokeData } from "../types";
 interface DrawingBoardProps {
   onStrokeUpdate: (strokes: StrokeData[]) => void;
   onDrawingStateChange: (isDrawing: boolean) => void;
+  setGeminiResponse: (response: string) => void;
 }
 
 const DrawingBoard: React.FC<DrawingBoardProps> = ({
   onStrokeUpdate,
   onDrawingStateChange,
+  setGeminiResponse,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -147,16 +149,17 @@ const DrawingBoard: React.FC<DrawingBoardProps> = ({
     setAllStrokes([]);
     setCurrentStroke([]);
     onStrokeUpdate([]);
+    setGeminiResponse("");
   }, [onStrokeUpdate]);
 
   return (
     <Card className="p-4">
       <div className="space-y-4">
-        <div className="relative w-full aspect-square bg-gray-50 rounded-lg overflow-hidden">
+        <div className="relative w-full h-96 bg-white rounded-lg overflow-hidden border border-gray-200">
           <canvas
             ref={canvasRef}
-            width={400}
-            height={200}
+            width={800}
+            height={800}
             className="absolute top-0 left-0 w-full h-full cursor-crosshair touch-none"
             onMouseDown={startDrawing}
             onMouseMove={draw}
@@ -169,7 +172,7 @@ const DrawingBoard: React.FC<DrawingBoardProps> = ({
         </div>
         <button
           onClick={clearCanvas}
-          className="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+          className="w-full py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
         >
           Clear Canvas
         </button>

@@ -17,16 +17,20 @@ const parseGeminiResponse = (response) => {
   };
 
   // Extract score from the text
-  const scoreText = extractSection("**Overall Quality Score (%)**");
-  const score = parseInt(scoreText) || 0;
+  const overallScoreText = extractSection("**Overall Quality Score (%)**");
+  const overallScore = parseInt(overallScoreText) || 0;
+
+  // Extract score from the text
+  const FormationScoreText = extractSection("**Formation Score (%)**");
+  const FormationScore = parseInt(FormationScoreText) || 0;
 
   return {
     strokeQuality: {
-      score: score,
+      score: overallScore,
       details: [extractSection("**Current Stroke Quality**")],
     },
     letterFormation: {
-      score: score,
+      score: FormationScore,
       details: [extractSection("**Letter Formation**")],
     },
     nextStrokes: extractSection("**Next Expected Strokes**")

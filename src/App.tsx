@@ -105,30 +105,34 @@ const App = () => {
                 },
                 {
                   text: `Analyze this handwritten ${languageInfo.language} character "${languageInfo.character}" 
-                           (${languageInfo.level} level). Provide detailed feedback on:
-                           1. Stroke quality and precision
-                           2. Character formation and proportions
-                           3. Next expected strokes or completions
-                           4. Common mistakes and suggestions for improvement.
+                           (${languageInfo.level} level). Provide a **strict and detailed** evaluation, focusing on:
+                           1. **Stroke Quality and Precision:** Assess stroke direction, order, length, angle, and pressure. For ${languageInfo.language}, ensure analysis covers expected line thickness and angle consistency.
+                           2. **Character Formation and Proportions:** Check for any deviations from ideal form, including symmetry, spacing, alignment, and proportion, based on ${languageInfo.language} writing conventions.
+                           3. **Next Expected Strokes or Completions:** Predict following strokes or completions, if applicable, referencing typical stroke patterns in ${languageInfo.language}.
+                           4. **Common Mistakes and Suggestions for Improvement:** List common issues specific to ${languageInfo.language} script formation and offer precise improvements.
+                           5. **Strict Analysis Requirement:** This review should be strict, with zero tolerance for deviations in stroke quality, stroke order, and character formation.
+                           6. **Additional Observations:** Include any other details pertinent to advanced ${languageInfo.language} script analysis.
                            
-                           Focus on script-specific features for the ${languageInfo.language} writing system.
-                           
-                           Additionally, provide an overall quality score of the handwriting as a percentage (0-100%).
+                           Provide an overall quality and formation score of the handwriting as a percentage (0-100%), where 100% reflects professional-level handwriting.
         
-                           Format your response with these exact headers:
+                           Use these headers exactly in your response:
                            **Current Stroke Quality**
                            **Letter Formation**
                            **Next Expected Strokes**
                            **Common Mistakes to Avoid**
-                           **Overall Quality Score (%)**`,
+                           **Overall Quality Score (%)**
+                           **Formation Score (%)**
+                           
+                           Be exacting in feedback, particularly on nuances unique to ${languageInfo.language} script.
+                           `,
                 },
               ],
             },
           ],
           generationConfig: {
-            temperature: 0.7,
-            topK: 40,
-            topP: 0.95,
+            temperature: 0.3,
+            topK: 20,
+            topP: 0.9,
             maxOutputTokens: 1024,
           },
         };
@@ -152,12 +156,24 @@ const App = () => {
     };
   }, [currentLanguage, currentLevel, currentCharacter]);
 
-  const handleLanguageChange = useCallback((info: LanguageChangeInfo): void => {
-    setCurrentLanguage(info.language);
-    setCurrentLevel(info.level);
-    setCurrentCharacter(info.character);
-    clearDrawing();
+  const clearDrawing = useCallback((): void => {
+    setStrokeData([]);
+    setIsDrawing(false);
+    setAnalysisResults({});
+    setIsAnalyzing(false);
+    setGeminiResponse(null);
   }, []);
+
+  const handleLanguageChange = useCallback(
+    (info: LanguageChangeInfo): void => {
+      setCurrentLanguage(info.language);
+      setCurrentLevel(info.level);
+      setCurrentCharacter(info.character);
+      clearDrawing();
+      setGeminiResponse(null);
+    },
+    [clearDrawing]
+  );
 
   const handleCharacterChange = useCallback(
     (info: CharacterChangeInfo): void => {
@@ -165,7 +181,7 @@ const App = () => {
       setCurrentLevel(info.level);
       clearDrawing();
     },
-    []
+    [clearDrawing]
   );
 
   const handleStrokeUpdate = useCallback(
@@ -197,13 +213,6 @@ const App = () => {
     },
     [strokeData, getCurrentLanguageInfo, analyzeStrokes]
   );
-
-  const clearDrawing = useCallback((): void => {
-    setStrokeData([]);
-    setIsDrawing(false);
-    setAnalysisResults({});
-    setIsAnalyzing(false);
-  }, []);
 
   const convertStrokesToImage = (strokes: StrokeData[]): Promise<string> => {
     return new Promise((resolve) => {
@@ -259,6 +268,7 @@ const App = () => {
             <DrawingBoard
               onStrokeUpdate={handleStrokeUpdate}
               onDrawingStateChange={handleDrawingStateChange}
+              setGeminiResponse={setGeminiResponse}
             />
           </div>
 

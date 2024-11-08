@@ -62,11 +62,6 @@ export class GeminiStreamingAnalysis {
       );
       streamUrl.searchParams.append("key", this.apiKey);
 
-      // console.log(
-      //   "Making request with prompt:",
-      //   JSON.stringify(prompt, null, 2)
-      // );
-
       const response = await fetch(streamUrl.toString(), {
         method: "POST",
         headers: {
