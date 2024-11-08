@@ -1,153 +1,213 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { LANGUAGE_DATA } from '../constants/languageData';
+import React, { useState, useEffect } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { LANGUAGE_DATA } from "../constants/languageData";
 
-const LanguageSelector = ({ 
-  onLanguageChange, 
+interface LanguageSelectorProps {
+  onLanguageChange: (info: {
+    language: string;
+    level: string;
+    character: string;
+  }) => void;
+  onCharacterChange: (info: { character: string; level: string }) => void;
+  currentLanguage: string;
+  currentLevel: string;
+}
+
+const LanguageSelector: React.FC<LanguageSelectorProps> = ({
+  onLanguageChange,
   onCharacterChange,
-  currentLanguage = 'english',
-  currentLevel = 'beginner'
+  currentLanguage,
+  currentLevel,
 }) => {
-  const [selectedLanguage, setSelectedLanguage] = useState(currentLanguage);
-  const [selectedLevel, setSelectedLevel] = useState(currentLevel);
-  const [characterIndex, setCharacterIndex] = useState(0);
+  const [selectedCharacter, setSelectedCharacter] = useState<string>("");
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-  const handleLanguageChange = (value) => {
-    setSelectedLanguage(value);
-    setSelectedLevel('beginner');
-    setCharacterIndex(0);
-    updateSelection(value, 'beginner', 0);
-  };
+  // Reset character when language or level changes
+  useEffect(() => {
+    const currentLevelData =
+      LANGUAGE_DATA[currentLanguage]?.levels[currentLevel];
+    if (currentLevelData && currentLevelData.characters.length > 0) {
+      const firstCharacter = currentLevelData.characters[0];
+      setSelectedCharacter(firstCharacter);
+      onCharacterChange({ character: firstCharacter, level: currentLevel });
+    }
+  }, [currentLanguage, currentLevel, onCharacterChange]);
 
-  const handleLevelChange = (value) => {
-    setSelectedLevel(value);
-    setCharacterIndex(0);
-    updateSelection(selectedLanguage, value, 0);
-  };
-
-  const updateSelection = (language, level, index) => {
-    const characters = LANGUAGE_DATA[language].levels[level].characters;
-    const info = {
+  const handleLanguageChange = (language: string) => {
+    const firstLevel = Object.keys(LANGUAGE_DATA[language].levels)[0];
+    const firstCharacter =
+      LANGUAGE_DATA[language].levels[firstLevel].characters[0];
+    onLanguageChange({
       language,
+      level: firstLevel,
+      character: firstCharacter,
+    });
+  };
+
+  const handleLevelChange = (level: string) => {
+    const firstCharacter =
+      LANGUAGE_DATA[currentLanguage].levels[level].characters[0];
+    onCharacterChange({
+      character: firstCharacter,
       level,
-      character: characters[index],
-      description: LANGUAGE_DATA[language].levels[level].description,
-      totalCharacters: characters.length,
-      currentIndex: index
-    };
-    onLanguageChange(info);
-    onCharacterChange(info);
+    });
   };
 
-  const nextCharacter = () => {
-    const characters = LANGUAGE_DATA[selectedLanguage].levels[selectedLevel].characters;
-    const newIndex = (characterIndex + 1) % characters.length;
-    setCharacterIndex(newIndex);
-    updateSelection(selectedLanguage, selectedLevel, newIndex);
+  const handleCharacterChange = (character: string) => {
+    setSelectedCharacter(character);
+    onCharacterChange({
+      character,
+      level: currentLevel,
+    });
+    setDialogOpen(false);
   };
 
-  const previousCharacter = () => {
-    const characters = LANGUAGE_DATA[selectedLanguage].levels[selectedLevel].characters;
-    const newIndex = characterIndex === 0 ? characters.length - 1 : characterIndex - 1;
-    setCharacterIndex(newIndex);
-    updateSelection(selectedLanguage, selectedLevel, newIndex);
-  };
-
-  const getCurrentCharacter = () => {
-    const characters = LANGUAGE_DATA[selectedLanguage].levels[selectedLevel].characters;
-    return characters[characterIndex];
-  };
-
-  const getCharacterCount = () => {
-    const characters = LANGUAGE_DATA[selectedLanguage].levels[selectedLevel].characters;
-    return characters.length;
+  const getSummaryText = () => {
+    const languageName = LANGUAGE_DATA[currentLanguage].name;
+    const levelName = LANGUAGE_DATA[currentLanguage].levels[currentLevel].name;
+    return (
+      <div className="flex items-center justify-between w-full pr-4">
+        <div className="flex items-center gap-4">
+          <span className="text-xl font-semibold">{selectedCharacter}</span>
+          <span className="text-sm text-muted-foreground">
+            {languageName} | {levelName}
+          </span>
+        </div>
+        <span className="text-sm text-muted-foreground">
+          {LANGUAGE_DATA[currentLanguage].script}
+        </span>
+      </div>
+    );
   };
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex justify-between items-center">
-          <span>Language Selection</span>
-          <span className={`text-sm font-normal ${getLanguageClass(selectedLanguage)}`}>
-            {LANGUAGE_DATA[selectedLanguage].name}
-          </span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select Language" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(LANGUAGE_DATA).map(([key, lang]) => (
-                <SelectItem key={key} value={key}>
-                  {lang.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+    <Card>
+      <CardContent className="p-4">
+        <Accordion type="single" collapsible className="w-full">
+          <AccordionItem value="language-settings">
+            <AccordionTrigger className="hover:no-underline">
+              {getSummaryText()}
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="space-y-4 pt-4">
+                {/* Language Selection */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    Select Language
+                  </label>
+                  <Select value={currentLanguage} onValueChange={handleLanguageChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a language" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(LANGUAGE_DATA).map(([key, data]) => (
+                        <SelectItem key={key} value={key}>
+                          {data.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-          <Select value={selectedLevel} onValueChange={handleLevelChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select Level" />
-            </SelectTrigger>
-            <SelectContent>
-            {Object.entries(LANGUAGE_DATA[selectedLanguage].levels).map(([key, level]) => {
-              const typedLevel = level as { name: string }; // Type assertion
-              return (
-                <SelectItem key={key} value={key}>
-                  {typedLevel.name}
-                </SelectItem>
-              );
-            })}
-            </SelectContent>
-          </Select>
-        </div>
+                {/* Level Selection */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    Select Level
+                  </label>
+                  <Select value={currentLevel} onValueChange={handleLevelChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(LANGUAGE_DATA[currentLanguage].levels).map(
+                        ([key, data]) => (
+                          <SelectItem key={key} value={key}>
+                            {(data as { name: string }).name}
+                          </SelectItem>
+                        )
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-gray-500">
+                    {LANGUAGE_DATA[currentLanguage].levels[currentLevel].description}
+                  </p>
+                </div>
 
-        <div className="mt-6">
-          <p className="text-sm text-gray-500 mb-2">
-            {LANGUAGE_DATA[selectedLanguage].levels[selectedLevel].description}
-          </p>
-        </div>
+                {/* Character Selection */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-gray-700">
+                      Selected Character:
+                    </label>
+                    <span className="text-xl font-semibold">{selectedCharacter}</span>
+                  </div>
+                  <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="w-full">
+                        Choose Character
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Select Character</DialogTitle>
+                      </DialogHeader>
+                      <div className="grid grid-cols-8 gap-2 p-4">
+                        {LANGUAGE_DATA[currentLanguage].levels[
+                          currentLevel
+                        ].characters.map((char) => (
+                          <button
+                            key={char}
+                            onClick={() => handleCharacterChange(char)}
+                            className={`p-2 text-center rounded-lg transition-colors hover:bg-secondary/80
+                              ${
+                                selectedCharacter === char
+                                  ? "bg-primary text-primary-foreground"
+                                  : "bg-secondary"
+                              }`}
+                          >
+                            {char}
+                          </button>
+                        ))}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
 
-        <div className="flex items-center justify-between mt-4">
-          <Button variant="outline" size="icon" onClick={previousCharacter}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-
-          <div className="text-center">
-            <div className={`text-4xl font-bold mb-2 ${getLanguageClass(selectedLanguage)}`}>
-              {getCurrentCharacter()}
-            </div>
-            <div className="text-sm text-gray-500">
-              Character {characterIndex + 1} of {getCharacterCount()}
-            </div>
-          </div>
-
-          <Button variant="outline" size="icon" onClick={nextCharacter}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
+                {/* Writing System Info */}
+                <div>
+                  <p className="text-sm text-gray-600">
+                    Script: {LANGUAGE_DATA[currentLanguage].script} | Writing Direction:{" "}
+                    {LANGUAGE_DATA[currentLanguage].writingDirection}
+                  </p>
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </CardContent>
     </Card>
   );
-};
-
-const getLanguageClass = (language) => {
-  switch (language) {
-    case 'telugu':
-      return 'lang-telugu';
-    case 'hindi':
-      return 'lang-hindi';
-    case 'japanese':
-      return 'lang-japanese';
-    default:
-      return '';
-  }
 };
 
 export default LanguageSelector;

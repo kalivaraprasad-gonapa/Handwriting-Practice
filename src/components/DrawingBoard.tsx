@@ -1,153 +1,179 @@
-import  { useState, useRef, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Undo2, RotateCcw } from 'lucide-react';  
+import React, { useRef, useState, useEffect, useCallback } from "react";
+import { Card } from "@/components/ui/card";
+import { StrokeData } from "../types";
 
-const DrawingBoard = ({ onStrokeUpdate, onDrawingStateChange }) => {
-  const canvasRef = useRef(null);
+interface DrawingBoardProps {
+  onStrokeUpdate: (strokes: StrokeData[]) => void;
+  onDrawingStateChange: (isDrawing: boolean) => void;
+}
+
+const DrawingBoard: React.FC<DrawingBoardProps> = ({
+  onStrokeUpdate,
+  onDrawingStateChange,
+}) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [context, setContext] = useState(null);
-  const [strokeHistory, setStrokeHistory] = useState([]);
-  const [currentStroke, setCurrentStroke] = useState([]);
+  const [currentStroke, setCurrentStroke] = useState<[number, number][]>([]);
+  const [allStrokes, setAllStrokes] = useState<StrokeData[]>([]);
+
+  const startDrawing = useCallback(
+    (
+      e:
+        | React.MouseEvent<HTMLCanvasElement>
+        | React.TouchEvent<HTMLCanvasElement>
+    ) => {
+      setIsDrawing(true);
+      onDrawingStateChange(true);
+      const point = getEventPoint(e);
+      setCurrentStroke([point]);
+    },
+    [onDrawingStateChange]
+  );
+
+  const draw = useCallback(
+    (
+      e:
+        | React.MouseEvent<HTMLCanvasElement>
+        | React.TouchEvent<HTMLCanvasElement>
+    ) => {
+      if (!isDrawing) return;
+      e.preventDefault();
+      const point = getEventPoint(e);
+      setCurrentStroke((prev) => [...prev, point]);
+    },
+    [isDrawing]
+  );
+
+  const stopDrawing = useCallback(() => {
+    if (!isDrawing) return;
+
+    if (currentStroke.length > 0) {
+      const newStroke: StrokeData = {
+        points: currentStroke,
+        timestamp: Date.now(),
+      };
+
+      const updatedStrokes = [...allStrokes, newStroke];
+      setAllStrokes(updatedStrokes);
+
+      // First update the strokes
+      onStrokeUpdate(updatedStrokes);
+      // Then signal that drawing has stopped
+      setIsDrawing(false);
+      onDrawingStateChange(false);
+    }
+
+    setCurrentStroke([]);
+  }, [
+    isDrawing,
+    currentStroke,
+    allStrokes,
+    onStrokeUpdate,
+    onDrawingStateChange,
+  ]);
+
+  const getEventPoint = (
+    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
+  ): [number, number] => {
+    const canvas = canvasRef.current;
+    if (!canvas) return [0, 0];
+
+    const rect = canvas.getBoundingClientRect();
+    let x, y;
+
+    if ("touches" in e) {
+      x = e.touches[0].clientX - rect.left;
+      y = e.touches[0].clientY - rect.top;
+    } else {
+      x = e.clientX - rect.left;
+      y = e.clientY - rect.top;
+    }
+
+    x = (x * canvas.width) / rect.width;
+    y = (y * canvas.height) / rect.height;
+
+    return [x, y];
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
-    
-    const ctx = canvas.getContext('2d');
-    ctx.strokeStyle = '#000';
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Set white background
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw all strokes
+    ctx.strokeStyle = "black";
     ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    setContext(ctx);
-  }, []);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
 
-  const startDrawing = (e) => {
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    context.beginPath();
-    context.moveTo(x, y);
-    setIsDrawing(true);
-    setCurrentStroke([[x, y]]);
-    onDrawingStateChange(true);
-  };
+    allStrokes.forEach((stroke) => {
+      if (stroke.points.length > 0) {
+        ctx.beginPath();
+        ctx.moveTo(stroke.points[0][0], stroke.points[0][1]);
+        stroke.points.forEach(([x, y]) => {
+          ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      }
+    });
 
-  const draw = (e) => {
-    if (!isDrawing) return;
-    
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    context.lineTo(x, y);
-    context.stroke();
-    setCurrentStroke(prev => [...prev, [x, y]]);
-  };
-
-  const stopDrawing = () => {
-    if (isDrawing) {
-      context.closePath();
-      setStrokeHistory(prev => [...prev, currentStroke]);
-      setCurrentStroke([]);
-      onStrokeUpdate([...strokeHistory, currentStroke]);
-    }
-    setIsDrawing(false);
-    onDrawingStateChange(false);
-  };
-
-  const clearCanvas = () => {
-    const canvas = canvasRef.current;
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    setStrokeHistory([]);
-    onStrokeUpdate([]);
-  };
-
-  const undo = () => {
-    if (strokeHistory.length === 0) return;
-    
-    const canvas = canvasRef.current;
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    
-    const newHistory = [...strokeHistory];
-    newHistory.pop();
-    setStrokeHistory(newHistory);
-    
-    // Redraw remaining strokes
-    newHistory.forEach(stroke => {
-      context.beginPath();
-      context.moveTo(stroke[0][0], stroke[0][1]);
-      stroke.forEach(([x, y]) => {
-        context.lineTo(x, y);
+    // Draw current stroke
+    if (currentStroke.length > 0) {
+      ctx.beginPath();
+      ctx.moveTo(currentStroke[0][0], currentStroke[0][1]);
+      currentStroke.forEach(([x, y]) => {
+        ctx.lineTo(x, y);
       });
-      context.stroke();
-      context.closePath();
-    });
+      ctx.stroke();
+    }
+  }, [allStrokes, currentStroke]);
 
-    onStrokeUpdate(newHistory);
-  };
+  const clearCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-  // Add touch support
-  const handleTouchStart = (e) => {
-    e.preventDefault();
-    const touch = e.touches[0];
-    const mouseEvent = new MouseEvent('mousedown', {
-      clientX: touch.clientX,
-      clientY: touch.clientY
-    });
-    startDrawing(mouseEvent);
-  };
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-  const handleTouchMove = (e) => {
-    e.preventDefault();
-    const touch = e.touches[0];
-    const mouseEvent = new MouseEvent('mousemove', {
-      clientX: touch.clientX,
-      clientY: touch.clientY
-    });
-    draw(mouseEvent);
-  };
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  const handleTouchEnd = (e) => {
-    e.preventDefault();
-    stopDrawing();
-  };
+    setAllStrokes([]);
+    setCurrentStroke([]);
+    onStrokeUpdate([]);
+  }, [onStrokeUpdate]);
 
   return (
-    <Card className="w-full">
-      <CardContent className="p-6">
-        <div className="mb-4 flex justify-end space-x-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={undo}
-            disabled={strokeHistory.length === 0}
-          >
-            <Undo2 className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={clearCanvas}
-          >
-            <RotateCcw className="h-4 w-4" />
-          </Button>
+    <Card className="p-4">
+      <div className="space-y-4">
+        <div className="relative w-full aspect-square bg-gray-50 rounded-lg overflow-hidden">
+          <canvas
+            ref={canvasRef}
+            width={400}
+            height={200}
+            className="absolute top-0 left-0 w-full h-full cursor-crosshair touch-none"
+            onMouseDown={startDrawing}
+            onMouseMove={draw}
+            onMouseUp={stopDrawing}
+            onMouseLeave={stopDrawing}
+            onTouchStart={startDrawing}
+            onTouchMove={draw}
+            onTouchEnd={stopDrawing}
+          />
         </div>
-        
-        <canvas
-          ref={canvasRef}
-          className="border rounded-lg w-full h-96 touch-none"
-          onMouseDown={startDrawing}
-          onMouseMove={draw}
-          onMouseUp={stopDrawing}
-          onMouseLeave={stopDrawing}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        />
-      </CardContent>
+        <button
+          onClick={clearCanvas}
+          className="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+        >
+          Clear Canvas
+        </button>
+      </div>
     </Card>
   );
 };

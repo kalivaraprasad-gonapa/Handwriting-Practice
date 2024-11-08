@@ -1,234 +1,339 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// src/services/aiStrokeAnalysis.js
+// types.ts
+export interface StrokeQualityAnalysis {
+  score: number;
+  details: string[];
+}
 
-class AIStrokeAnalysisService {
-  aiProvider: string; // Define type for aiProvider
-  apiKey: string; // Define type for apiKey
-  strokeBuffer: any[]; // Define type for strokeBuffer
-  isAnalyzing: boolean; // Define type for isAnalyzing
+export interface LetterFormationAnalysis {
+  score: number;
+  details: string[];
+}
 
-  constructor(aiProvider, apiKey) {
-    this.aiProvider = aiProvider;
+export interface CommonMistakesAnalysis {
+  mistakes: string[];
+  improvements: string[];
+}
+
+export interface AnalysisCallbacks {
+  onStrokeQuality?: (analysis: StrokeQualityAnalysis) => void;
+  onLetterFormation?: (analysis: LetterFormationAnalysis) => void;
+  onNextStrokes?: (strokes: string[]) => void;
+  onCommonMistakes?: (analysis: CommonMistakesAnalysis) => void;
+  onComplete?: (finalAnalysis: string) => void;
+  onError?: (error: Error) => void;
+}
+
+export interface GeminiPrompt {
+  contents: {
+    parts: {
+      text: string;
+      image?: {
+        type: string;
+        source: {
+          type: string;
+          media_type: string;
+          data: string;
+        };
+      };
+    }[];
+  }[];
+  generationConfig: {
+    temperature: number;
+    topK: number;
+    topP: number;
+    maxOutputTokens: number;
+  };
+  safetySettings?: {
+    category: string;
+    threshold: string;
+  }[];
+}
+
+export interface GeminiResponse {
+  candidates?: {
+    content?: {
+      parts?: {
+        text?: string;
+      }[];
+    };
+  }[];
+}
+
+export type QualityIndicators = {
+  [key: string]: number;
+};
+
+// geminiStreamingService.ts
+export class GeminiStreamingAnalysis {
+  private apiKey: string;
+  private analysisBuffer: string;
+  private readonly qualityIndicators: QualityIndicators;
+  private readonly formationIndicators: QualityIndicators;
+
+  constructor(apiKey: string) {
     this.apiKey = apiKey;
-    this.strokeBuffer = [];
-    this.isAnalyzing = false;
-  }
+    this.analysisBuffer = "";
 
-  async analyzeStroke(stroke, character, language, level) {
-    // Add new stroke to buffer
-    this.strokeBuffer.push(stroke);
-
-    // Convert strokes to image
-    const imageData = await this.convertStrokesToImage(this.strokeBuffer);
-
-    // Prepare language-specific context
-    const context = this.getLanguageContext(language, character, level);
-
-    // Get real-time analysis from AI
-    const analysis = await this.getAIAnalysis(imageData, context);
-
-    return analysis;
-  }
-
-  async convertStrokesToImage(strokes) {
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    canvas.width = 400;
-    canvas.height = 400;
-
-    // Set white background
-    ctx.fillStyle = "white";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Draw strokes
-    ctx.strokeStyle = "black";
-    ctx.lineWidth = 2;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    strokes.forEach((stroke) => {
-      if (stroke.length > 0) {
-        ctx.beginPath();
-        ctx.moveTo(stroke[0][0], stroke[0][1]);
-        stroke.forEach(([x, y]) => ctx.lineTo(x, y));
-        ctx.stroke();
-      }
-    });
-
-    return canvas.toDataURL("image/png");
-  }
-
-  getLanguageContext(language, character, level) {
-    const contextMap = {
-      telugu: {
-        prompt: `Analyze this handwritten Telugu ${character} in real-time. 
-                  Consider:
-                  1. Stroke direction and order
-                  2. Character proportions and curves
-                  3. Connection points
-                  4. Spacing and alignment
-                  
-                  Provide specific feedback on:
-                  1. Current stroke quality
-                  2. Suggested improvements
-                  3. Next expected strokes
-                  4. Common mistakes to avoid`,
-        scriptFeatures: ["curves", "loops", "connections"],
-      },
-      hindi: {
-        prompt: `Analyze this handwritten Hindi ${character} in real-time.
-                  Consider:
-                  1. Headline (शिरोरेखा) placement
-                  2. Stroke order and direction
-                  3. Character proportions
-                  4. Matra placement
-                  
-                  Provide specific feedback on:
-                  1. Current stroke accuracy
-                  2. Alignment with headline
-                  3. Next expected strokes
-                  4. Common mistakes to avoid`,
-        scriptFeatures: ["headline", "connections", "matras"],
-      },
-      japanese: {
-        prompt: `Analyze this handwritten Japanese ${character} in real-time.
-                  Consider:
-                  1. Stroke order (筆順)
-                  2. Stroke direction
-                  3. Character balance
-                  4. Proper proportions
-                  
-                  Provide specific feedback on:
-                  1. Current stroke precision
-                  2. Stroke order accuracy
-                  3. Next expected stroke
-                  4. Common mistakes to avoid`,
-        scriptFeatures: ["strokeOrder", "balance", "proportions"],
-      },
-      english: {
-        prompt: `Analyze this handwritten English ${character} in real-time.
-                  Consider:
-                  1. Stroke direction
-                  2. Letter proportions
-                  3. Baseline alignment
-                  4. Character spacing
-                  
-                  Provide specific feedback on:
-                  1. Current stroke quality
-                  2. Letter formation
-                  3. Next expected strokes
-                  4. Common mistakes to avoid`,
-        scriptFeatures: ["baseline", "proportions", "spacing"],
-      },
+    // Initialize quality indicators
+    this.qualityIndicators = {
+      good: 1,
+      smooth: 0.8,
+      consistent: 0.8,
+      accurate: 0.9,
+      precise: 0.9,
     };
 
-    return contextMap[language] || contextMap.english;
+    this.formationIndicators = {
+      "well-formed": 1,
+      clear: 0.8,
+      distinct: 0.8,
+      correct: 0.9,
+      natural: 0.8,
+      flowing: 0.7,
+      good: 0.8,
+    };
   }
 
-  async getAIAnalysis(imageData, context) {
-    const prompt = {
-      messages: [
+  public async analyzeWithGemini(
+    prompt: string | GeminiPrompt,
+    callbacks: AnalysisCallbacks = {}
+  ): Promise<void> {
+    if (!this.apiKey) {
+      throw new Error("API key is required");
+    }
+
+    const formattedPrompt: GeminiPrompt = {
+      contents: [
         {
-          role: "user",
-          content: [
+          parts: [
             {
-              type: "text",
-              text: context.prompt,
-            },
-            {
-              type: "image",
-              source: {
-                type: "base64",
-                media_type: "image/png",
-                data: imageData.split(",")[1],
-              },
+              text:
+                typeof prompt === "string" ? prompt : JSON.stringify(prompt),
             },
           ],
         },
       ],
+      generationConfig: {
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 1024,
+      },
     };
 
     try {
-      let response;
-      switch (this.aiProvider) {
-        case "claude":
-          response = await this.analyzeWithClaude(prompt);
-          break;
-        case "gemini":
-          response = await this.analyzeWithGemini(prompt);
-          break;
-        default:
-          throw new Error("Unsupported AI provider");
-      }
+      const streamUrl = new URL(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:streamGenerateContent"
+      );
+      streamUrl.searchParams.append("key", this.apiKey);
 
-      return this.parseAIResponse(response);
-    } catch (error) {
-      console.error("AI analysis error:", error);
-      throw error;
-    }
-  }
-
-  async analyzeWithClaude(prompt) {
-    const response = await fetch("your-claude-endpoint", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(prompt),
-    });
-
-    return await response.json();
-  }
-
-  async analyzeWithGemini(prompt) {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key=${this.apiKey}`,
-      {
+      const response = await fetch(streamUrl.toString(), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Accept: "text/event-stream",
         },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: prompt.messages[0].content,
-            },
-          ],
-        }),
+        body: JSON.stringify(formattedPrompt),
+      });
+
+      if (!response.body) {
+        throw new Error("Response body is null");
       }
-    );
 
-    return await response.json();
-  }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
 
-  parseAIResponse(response) {
-    // Structure the AI response into a consistent format
-    try {
-      const analysis = {
-        currentStroke: {
-          quality: null,
-          issues: [],
-          suggestions: [],
-        },
-        nextStrokes: [],
-        overallFeedback: {
-          accuracy: 0,
-          improvements: [],
-          commonMistakes: [],
-        },
-      };
+      while (true) {
+        const { done, value } = await reader.read();
 
-      // Parse the AI response text and extract relevant information
-      // This would depend on the specific format returned by the AI provider
+        if (done) {
+          if (callbacks.onComplete) {
+            callbacks.onComplete(this.analysisBuffer);
+          }
+          break;
+        }
 
-      return analysis;
+        const chunk = decoder.decode(value, { stream: true });
+        await this.processStreamChunk(chunk, callbacks);
+      }
     } catch (error) {
-      console.error("Error parsing AI response:", error);
+      if (callbacks.onError) {
+        callbacks.onError(
+          error instanceof Error ? error : new Error(String(error))
+        );
+      }
       throw error;
     }
   }
+
+  private extractTextFromChunk(data: GeminiResponse): string {
+    try {
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    } catch (error) {
+      console.warn("Error extracting text from chunk:", error);
+      return "";
+    }
+  }
+
+  private async processStreamChunk(
+    chunk: string,
+    callbacks: AnalysisCallbacks
+  ): Promise<void> {
+    this.analysisBuffer += chunk;
+
+    const sections = this.analysisBuffer
+      .split("**")
+      .filter((section) => section.trim());
+
+    for (const section of sections) {
+      const lines = section.split("\n").filter((line) => line.trim());
+      if (lines.length === 0) continue;
+
+      const header = lines[0].trim().toLowerCase();
+      const bulletPoints = lines
+        .slice(1)
+        .filter((line) => line.startsWith("*"))
+        .map((line) => line.replace("* ", "").trim());
+
+      switch (header) {
+        case "current stroke quality": {
+          if (callbacks.onStrokeQuality) {
+            callbacks.onStrokeQuality(this.analyzeStrokeQuality(bulletPoints));
+          }
+          break;
+        }
+        case "letter formation": {
+          if (callbacks.onLetterFormation) {
+            callbacks.onLetterFormation(
+              this.analyzeLetterFormation(bulletPoints)
+            );
+          }
+          break;
+        }
+        case "next expected strokes": {
+          if (callbacks.onNextStrokes) {
+            callbacks.onNextStrokes(bulletPoints);
+          }
+          break;
+        }
+        case "common mistakes to avoid": {
+          if (callbacks.onCommonMistakes) {
+            callbacks.onCommonMistakes(
+              this.analyzeCommonMistakes(bulletPoints)
+            );
+          }
+          break;
+        }
+      }
+    }
+
+    this.analysisBuffer = "";
+  }
+
+  private analyzeStrokeQuality(bulletPoints: string[]): StrokeQualityAnalysis {
+    const { score } = this.calculateQualityScore(
+      bulletPoints,
+      this.qualityIndicators
+    );
+    return {
+      score,
+      details: bulletPoints,
+    };
+  }
+
+  private analyzeLetterFormation(
+    bulletPoints: string[]
+  ): LetterFormationAnalysis {
+    const { score } = this.calculateQualityScore(
+      bulletPoints,
+      this.formationIndicators
+    );
+    return {
+      score,
+      details: bulletPoints,
+    };
+  }
+
+  private analyzeCommonMistakes(
+    bulletPoints: string[]
+  ): CommonMistakesAnalysis {
+    return {
+      mistakes: bulletPoints,
+      improvements: bulletPoints.map(
+        (mistake) => `Improve: ${mistake.replace("Avoid ", "")}`
+      ),
+    };
+  }
+
+  private calculateQualityScore(
+    bulletPoints: string[],
+    indicators: QualityIndicators
+  ): { score: number; total: number } {
+    let score = 0;
+    let total = 0;
+
+    bulletPoints.forEach((point) => {
+      Object.entries(indicators).forEach(([indicator, weight]) => {
+        if (point.toLowerCase().includes(indicator)) {
+          score += weight;
+          total++;
+        }
+      });
+    });
+
+    return {
+      score: total > 0 ? Math.round((score / total) * 100) : 50,
+      total,
+    };
+  }
 }
 
-export default AIStrokeAnalysisService;
+// Example usage with TypeScript:
+/*
+import { GeminiStreamingAnalysis, AnalysisCallbacks } from './geminiStreamingService';
+
+const analysisService = new GeminiStreamingAnalysis('your-api-key');
+
+const handlers: AnalysisCallbacks = {
+  onStrokeQuality: (analysis) => {
+    console.log('Stroke Quality Update:', analysis.score, analysis.details);
+  },
+  onLetterFormation: (analysis) => {
+    console.log('Letter Formation Update:', analysis.score, analysis.details);
+  },
+  onNextStrokes: (strokes) => {
+    console.log('Next Strokes Update:', strokes);
+  },
+  onCommonMistakes: (mistakes) => {
+    console.log('Common Mistakes Update:', mistakes.mistakes, mistakes.improvements);
+  },
+  onComplete: (finalAnalysis) => {
+    console.log('Analysis Complete:', finalAnalysis);
+  },
+  onError: (error) => {
+    console.error('Analysis Error:', error.message);
+  }
+};
+
+// Using with a text prompt
+await analysisService.analyzeWithGemini("Analyze this handwriting...", handlers);
+
+// Using with a structured prompt including an image
+const imagePrompt = {
+  contents: [{
+    parts: [{
+      text: "Analyze this handwriting...",
+      image: {
+        type: "base64",
+        source: {
+          type: "base64",
+          media_type: "image/png",
+          data: "your-base64-image-data"
+        }
+      }
+    }]
+  }]
+};
+
+await analysisService.analyzeWithGemini(imagePrompt, handlers);
+*/
