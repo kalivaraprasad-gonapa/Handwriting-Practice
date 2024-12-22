@@ -210,19 +210,6 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 
 ## 🙏 Acknowledgments
 
-- [Anthropic's Claude](https://www.anthropic.com/claude) for AI analysis
 - [Google's Gemini](https://deepmind.google/technologies/gemini/) for AI analysis
 - [shadcn/ui](https://ui.shadcn.com/) for UI components
 - [Tailwind CSS](https://tailwindcss.com/) for styling
-
-## 📞 Support
-
-For support, please:
-
-1. Check the [Issues](https://github.com/yourusername/handwriting-practice/issues) page
-2. Create a new issue if needed
-3. Contact the maintainers
-
----
-
-Made with ❤️ for language learners worldwide
